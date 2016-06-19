@@ -1,0 +1,275 @@
+<!DOCTYPE HTML>
+<title>Reminder System</title>
+<meta name="viewport" content="user-scalable=no,width=400">
+<link rel=icon href="images/favicon.png">
+<style>
+ /* defaults */
+ * { font: inherit; }
+ body { font: 400 1em Roboto, Helvetica Neue, sans-serif; margin: 0.25em 0 4em 1em; max-width: 20em; }
+ body.top { margin: 1em auto; }
+ section { text-align: center; }
+ section:not(:last-of-type) { margin-bottom: 1em; }
+ p { margin: 0; }
+ button { border: 1px solid; padding: 0.2em 0.5em; width: 100%; box-sizing: border-box; border-radius: 1em; }
+ body:not(.active) #messages, .client-message, #credentials { background: rgba(255, 255, 255, 0.75); border-radius: 1em; padding: 0.5em 1em; }
+ p img { vertical-align: middle; height: 10em; margin: 0 1em 0 0; }
+
+ /* the reminders */
+ section#messages { color: #000; }
+ section#messages div { background-color: #FFE; border: thin solid #990; padding: 0.25em 0.5em; box-shadow: 0 0 8px #999; border-radius: 0.125em; }
+ section#messages div + div { margin-top: 0.75em; }
+ section#messages button { margin: 0.25em 1em; padding: 0.25em 0.75em; width: auto; font-size: 1em; border-color: #990; background: #DD0; color: #000; }
+ section#messages .done button { border-color: #DDD; background: #DDD; color: #666; }
+ section#messages button:active:hover { border-color: #990; background: #990; color: #FFF; }
+ section#messages button.highlighted { padding: 0.06em 0.56em; border-width: 0.2em; border-color: currentColor; }
+ section#messages .multi-stage button.highlighted { border-color: #DDD; background: #DDD; color: #666; }
+ section#messages .multi-stage button.highlighted::before { content: '✔‬' }
+ section#messages .test-strip { margin: 0.25em 1em; padding: 0.2em; font-size: 0.75em; }
+ section#messages .test-strip p.button { display: inline-block; margin: 0 0.5em; }
+ section#messages .test-strip p.button button { margin: 0.25em 0; }
+ section#messages .escalated-level-1:not(.todo) { }
+ section#messages .escalated-level-2:not(.todo) { box-shadow: 0 0 16px #900; font-weight: bold; }
+ section#messages .escalated-level-3:not(.todo) { border: solid red 0.2em; } /* birman talks */
+ section#messages .escalated-level-4:not(.todo) { font-size: 1.25em; } /* birman talks */
+ section#messages .escalated-level-5:not(.todo) > p:first-child { font-size: 1.5em; }
+ section#messages .escalated-level-6:not(.todo) { background: red; color: yellow; margin: 0.75em 0 0; }
+ section#messages .escalated-level-6:not(.todo) > *:not(:last-child) { margin-bottom: 0.25em; }
+
+ /* special reminders */
+ section#messages .warning { border: red solid; background: maroon; color: yellow; border-radius: 0.25em; position: relative; padding: 1.5em 1em 1em; margin: 1.5em 0 1em; font-size: 1.25em; }
+ section#messages .warning::before { position: absolute; width: 11em; margin: auto; top: -0.75em; left: 0; right: 0; content: '\26A0\A0\A0WARNING\A0\A0\26A0'; background: yellow; color: maroon; border: red solid; border-radius: 1em; font-weight: 900; white-space: pre; }
+ section#messages .soup { background: white url(images/looking-right-with-spoon.gif) no-repeat 1em 1em / auto 9em; color: black; padding: 1em 1em 1em 7em; min-height: 9em; }
+ section#messages .soup p:first-child { margin: 1.5em 2em 1.75em; }
+ section#messages .guests { background: white url(images/standing-tall.gif) no-repeat 1em 1em / auto 9em; color: black; padding: 1em 1em 1em 7em; min-height: 9em; }
+ section#messages .guests p:first-child { margin: 1.5em 2em 1.75em; }
+
+ section#messages .filter-hidden { display: none; }
+
+ section#messages div.hottub { background-color: #EEF; border-color: #009; }
+ section#messages .hottub button { border-color: #009; background-color: #CCF; color: #000; }
+ section#messages .hottub button:active:hover { border-color: #009; background: #009; }
+ section#messages .hottub.escalated-level-2:not(.todo) { box-shadow: 0 0 16px #009; }
+ section#messages .hottub.escalated-level-3:not(.todo) { border-color: #00F; }
+ section#messages .hottub.escalated-level-6:not(.todo) { background: #009; color: #FFF; }
+
+/*
+ section#messages div.ian { background-color: #EFE; border-color: #090; }
+ section#messages .ian button { border-color: #090; background-color: #CFC; color: #000; }
+ section#messages .ian button:active:hover { border-color: #090; background: #090; }
+ section#messages .ian.escalated-level-2:not(.todo) { box-shadow: 0 0 16px #090; }
+ section#messages .ian.escalated-level-3:not(.todo) { border-color: #0F0; }
+ section#messages .ian.escalated-level-6:not(.todo) { background: #090; color: #FFF; }
+*/
+
+ /* everything else */
+ section#buttons { margin-bottom: 0; padding-bottom: 0; border-radius: 1em 1em 0 0; }
+ section#todos { margin-top: 0; padding-top: 0; border-radius: 0 0 1em 1em; }
+ section.more { background: rgba(255, 255, 255, 0.5); border-radius: 1em; padding: 0.5em 0; }
+ section.more p { margin: 0.25em 1em; font-size: 0.65em; }
+ section.more details { margin: 0; padding: 0.25em 0 0.25em 0; }
+ section.more summary { margin: 0.25em; padding: 0.5em 2em; font-size: 0.65em; font-weight: bolder; text-align: left; cursor: default; background: #EEE; border-radius: 1em; }
+ section.more summary:active:hover { background: #999; color: #FFF; }
+ section.more [open] summary { border-radius: 1em 1em 0 0; }
+ section.more summary:focus { outline: none; }
+ section.more button { border-color: #CCC; background: #DDD; color: #000; padding: 0.5em 0.5em; margin: 0.1em 0; }
+ section.more button:active:hover { background: #999; color: #FFF; }
+ section.more button.highlighted { border-width: 4px; border-color: #999; }
+ section#credentials { font-size: 0.65em; }
+
+ section#messages button.clicked { border-color: #090; background: #090; color: #FFF; }
+
+ section#messages .automatic { font: small-caps 1em/1 monospace; border: none; border-radius: 0; background: black; color: green; display: none; }
+ section#messages .automatic button { background: gray; color: white; border-color: black; border-radius: 1px; }
+
+ /* debugging labels */
+ p:not(.selected).selectable { background-image: url(/resources/images/11x11-green); background-repeat: no-repeat; background-position: top right; }
+ p:not(.promoted).selected { background-image: url(/resources/images/11x11-red); background-repeat: no-repeat; background-position: top right; }
+
+ form { display: table; margin: 0 auto 2em; border-spacing: 0.25em 0.25em; }
+ form > p { display: table-row-group; }
+ form > p > label { display: table-row; }
+ form > p > label > span { display: table-cell; }
+ /* hover effects */
+ section { transition: opacity 0.25s; }
+ html:not(:hover) section:not(#messages) { opacity: 0; }
+</style>
+<body>
+<script>
+ if (window == window.top)
+   document.body.classList.add('top');
+ var filter = '';
+ if (location.search.substr(0, 8) == '?filter=')
+   filter = location.search.substr(8);
+</script>
+<script src="objects.js"></script>
+<script src="utils.js"></script>
+<section id="messages">Connection to reminder system server not yet established.</section>
+<section class="more" id="buttons"></section>
+<section class="more" id="todos"><details><summary>Tasks</summary><div></div></details></section>
+<section id="credentials">
+ <form id="login">
+  <p><label><span>Username:</span> <span><input name=username></span></label>
+  <p><label><span>Password:</span> <span><input name=password type=password></span></label>
+ </form>
+ <p>Last pong: <output id="last-message-stamp">never</output></p>
+</section>
+<script>
+  var buttonsDiv = document.getElementById('buttons');
+  var messagesDiv = document.getElementById('messages');
+  var todosDiv = document.getElementById('todos').firstChild.lastChild;
+  var taskCount;
+  var openSummaries = null;
+  var ws;
+  function setupNetwork() {
+    try {
+      ws = new WebSocket('ws://damowmow.com:12548');
+    } catch (e) {
+      messagesDiv.textContent = 'Error setting up WebSocket: ' + e.message;
+      buttonsDiv.textContent = '';
+      document.body.classList.remove('active');
+      ws = null;
+    }
+    startConnectionLostTimer();
+    ws.onmessage = function (event) {
+      cancelConnectionLostTimer();
+      if (event.data == 'pong') {
+        document.getElementById('last-message-stamp').textContent = new Date();
+        return;
+      }
+      segments = event.data.split('\0\0');
+      if (segments.length == 0) return;
+      if (segments[0] == 'update') {
+        segments.shift();
+        openSummaries = Array.prototype.map.call(buttonsDiv.querySelectorAll('details[open] > summary'), function (summary) { return summary.textContent });
+        buttonsDiv.textContent = '';
+        messagesDiv.textContent = '';
+        todosDiv.textContent = '';
+        taskCount = 0;
+        var bits = segments.map(function (a) { return a.split('\0') });
+        for (var bit in bits) {
+          if (bits[bit][0] == 'button')
+            showButton(bits[bit][1], bits[bit][2], bits[bit][3]);
+          else if (bits[bit][0] == 'message')
+            showMessage(bits[bit][1], bits[bit][2], bits[bit][3], bits[bit].splice(4));
+          else if (bits[bit][0] == 'todo')
+            showToDo(bits[bit][1], bits[bit][2], bits[bit][3], bits[bit][4]);
+        }
+        openSummaries = null;
+        if (taskCount == 0)
+          messagesDiv.appendChild(E('p', { class: 'client-message nothing' },
+                                         E('img', { src: 'images/looking-right.gif', alt: '' }),
+                                         'Have fun!'));
+        if (todosDiv.childNodes.length == 0)
+          todosDiv.appendChild(E('p', 'No pending tasks!'));
+      }
+    };
+    ws.onopen = function () {
+      document.body.classList.add('active');
+    };
+    ws.onerror = function (event) {
+      if (event.target != ws) return;
+      messagesDiv.textContent = 'Error. ' + new Date();
+      buttonsDiv.textContent = '';
+      document.body.classList.remove('active');
+    };
+    ws.onclose = function (event) {
+      if (event && (event.target != ws)) return;
+      forceClose();
+    };
+  }
+  function forceClose() {
+    if (ws) {
+      ws.onmessage = null;
+      ws.onopen = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      ws = null;
+    }
+    messagesDiv.textContent = 'No connection to reminder system server. ' + new Date();
+    buttonsDiv.textContent = '';
+    document.body.classList.remove('active');
+    setTimeout(setupNetwork, 500);
+  }
+  setInterval(function () {
+    ws.send(username() + '\0' + password() + '\0' + ''); // ping
+    startConnectionLostTimer();
+  }, 60000);
+  var lastTimer = null;
+  function startConnectionLostTimer() {
+    cancelConnectionLostTimer();
+    lastTimer = setTimeout(function () {
+      ws.close();
+      forceClose();
+    }, 2000);
+  }
+  function cancelConnectionLostTimer() {
+    if (lastTimer)
+      clearTimeout(lastTimer);
+  }
+  function getClick(button) {
+    return function (event) {
+      event.target.disabled = true;
+      event.target.classList.add('clicked');
+      ws.send(username() + '\0' + password() + '\0' + button);
+      startConnectionLostTimer();
+    };
+  }
+  function showButton(id, highlighted, label) {
+    buttonsDiv.appendChild(E('p', { id: 'button-' + id, class: 'button ' + highlighted }, E('button', { class: highlighted, onclick: getClick(id) }, label)));
+  }
+  function showMessage(message, classLabel, escalation, buttons) {
+    var classLabelBits = classLabel.split(' ');
+    var settings = 'message';
+    if (classLabelBits.length > 0)
+      settings += ' ' + classLabel;
+    if (filter != '' && classLabelBits.indexOf(filter) < 0)
+      settings += ' filter-hidden';
+    for (var i = 1; i <= escalation; i += 1)
+      settings += ' escalated-level-' + i;
+    var div;
+    if (classLabelBits.indexOf('group') >= 0) {
+      div = E('details', { class: settings, open: openSummaries.indexOf(message) >= 0 }, E('summary', message));
+    } else {
+      div = E('div', { class: settings }, E('p', message));
+    }
+    for (var i in buttons) {
+      var button = document.getElementById('button-' + buttons[i]);
+      if (button) {
+        if ((!div.classList.contains('group')) || (button.parentNode == buttonsDiv))
+          div.appendChild(button);
+      } else {
+        console.warn('button not found (probably promoted twice): ', buttons[i]);
+      }
+    }
+    if (div.classList.contains('group')) {
+      if (div.childNodes.length > 1)
+        buttonsDiv.appendChild(div);
+    } else if (div.classList.contains('warning')) {
+      messagesDiv.insertBefore(div, messagesDiv.firstChild);
+    } else {
+      if (!div.classList.contains('notice') && !div.classList.contains('filter-hidden'))
+        taskCount += 1;
+      messagesDiv.appendChild(div);
+    }
+  }
+  function showToDo(id, message, classLabel, escalation) {
+    var classLabelBits = classLabel.split(' ');
+    var promote = (classLabelBits.indexOf('selected') >= 0) && (classLabelBits.indexOf('promoted') >= 0);
+    if (promote)
+      buttonLabel = 'Task completed!';
+    else
+      buttonLabel = 'Completed task: ' + message;
+    todosDiv.appendChild(E('p', { id: 'button-' + id, class: 'button todo ' + classLabel }, E('button', { onclick: getClick(id) }, buttonLabel)));
+    if (promote)
+      showMessage(message, classLabel + ' todo', escalation, [id]);
+  }
+  function username() { return document.forms.login.username.value }
+  function password() { return document.forms.login.password.value }
+  if (localStorage.reminderSystemUsername)
+    document.forms.login.username.value = localStorage.reminderSystemUsername;
+  document.forms.login.username.oninput = function (event) { localStorage.reminderSystemUsername = document.forms.login.username.value };
+  if (localStorage.reminderSystemPassword)
+    document.forms.login.password.value = localStorage.reminderSystemPassword;
+  document.forms.login.password.oninput = function (event) { localStorage.reminderSystemPassword = document.forms.login.password.value };
+  onload = setupNetwork;
+</script>

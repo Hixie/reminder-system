@@ -1,0 +1,23 @@
+#!/usr/bin/perl -wT
+use strict;
+use IO::Socket;
+
+die unless $ENV{REQUEST_METHOD} eq 'POST';
+my @data = split('/', $ENV{PATH_INFO});
+die if scalar @data != 4;
+
+print STDOUT "Status: 200 OK\r\nContent-Type: text/plain\r\n\r\n";
+print STDOUT "USERNAME: $data[1]\nCOMMAND: $data[3]\n";
+
+pushButton($data[1], $data[2], $data[3]);
+
+sub pushButton {
+    my($username, $password, $button) = @_;
+    print STDERR "USERNAME: $username\nPASSWORD: $password\nBUTTON: $button\n";
+    die if $username =~ m/\0/os;
+    die if $password =~ m/\0/os;
+    die if $button =~ m/\0/os;
+    my $socket = IO::Socket::INET->new(PeerAddr => 'damowmow.com', PeerPort => 12549, Proto => 'tcp') or die "connect failed $!";
+    print $socket "$username\0$password\0$button\0\0\0";
+    close $socket;
+}

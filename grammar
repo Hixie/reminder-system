@@ -1,0 +1,113 @@
+
+Best practices:
+
+Have one state per physical state.
+Have one state per orthogonal intended state of the system.
+Have buttons for each valid transition of physical states or intended states.
+Have behaviours for each combination of physical states and intended states where something interesting can happen.
+
+---------------------
+
+<id>: state {
+  // any number of any of the following:
+  <value> [<condition-or-time-range>];
+  ...
+}
+
+<id>: button 'label' [<condition-or-time-range>] [highlight <condition-or-time-range>] {
+  set <state> to <value>;
+  imply <button>; // also clicks that button for you
+  ...;
+}
+
+<id>: behaviour [<condition-or-time-range>] {
+  message 'message';
+  class 'class';
+  class 'class' <condition>;
+  promote <button>;
+  escalate immediately;
+  escalate after <duration> [after <event>];
+  escalate every <time-unit> [after <event>];
+  escalate every <duration> [after <event>];
+  ...;
+}
+
+<id>: todo 'label' [<condition-or-time-range>] {
+  select <condition-or-time-range>;
+  lasts <duration>;
+  class 'class';
+  class 'class' <condition>;
+}
+
+<condition-or-time-range>:
+  when <condition>
+  <time-range>
+
+<condition>:
+  <condition-element>
+  <condition-element> <and-condition-element>
+  <condition-element> <or-condition-element>
+  <condition-element> <time-range>
+
+<and-condition-element>:
+  <condition-element>
+  <condition-element> and <and-condition-element>
+
+<or-condition-element>:
+  <condition-element>
+  <condition-element> or <or-condition-element>
+
+<condition-element>:
+  <behaviour>
+  not <behaviour>
+  <todo> is relevant
+  <todo> is not relevant
+  <todo> is done
+  <todo> is not done
+  <state> is <value>
+  <state> is not <value>
+  <event> before <event>
+  <event> after <event>
+  <event> over <duration> ago
+  <event> under <duration> ago
+  (<condition>)
+  (<time-range>)
+  not (<condition>)
+  not (<time-range>)
+
+<event>
+  <state> changed
+  <button> pressed
+  <behaviour> triggered
+
+<time-range>
+  between <repeating-time> and <repeating-time>
+  for <duration> after <repeating-time>
+
+<time-unit>: week, weeks, day, days, hour, hours, minute, minutes, second, seconds
+
+<duration>
+  <n> <time-unit>
+
+; omitting the hours/minutes implies midnight
+; so "between mondays and tuesdays" really means "for 24 hours after mondays at 00:00"
+; omitting <day> after <monthname> implies the first of the month
+; so "between january and february" really means all of january
+<repeating-time>:
+  first <dayname> [at <hour>:<min>]
+  second <dayname> [at <hour>:<min>]
+  third <dayname> [at <hour>:<min>]
+  fourth <dayname> [at <hour>:<min>]
+  fifth <dayname> [at <hour>:<min>]
+  alternating <dayname>s (starting <year>-<month>-<day>) [at <hour>:<min>]
+  every <duration> starting [<dayname>] <year>-<month>-<day> at <hour>:<min>
+  every <time-unit> starting [<dayname>] <year>-<month>-<day> at <hour>:<min>
+  <dayname>s [at <hour>:<min>]
+  <monthname> [<day>] [at <hour>:<min>]  ; "february 29" not allowed
+  <duration> before <repeating-time>
+  at <hour>:<min>
+
+
+<year>, <month>, <day>, <hour>, <min>: integers in appropriate range
+<dayname>: monday, tuesday, etc
+<monthname>: january, february, etc

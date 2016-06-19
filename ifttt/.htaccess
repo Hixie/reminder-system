@@ -1,0 +1,3 @@
+<files xmlrpc.php>
+   SetHandler cgi-script
+</files>
