@@ -4,8 +4,8 @@ unit corenetwork;
 
 interface
 
-{$DEFINE VERBOSE_NETWORK}
-//{$DEFINE SUPER_VERBOSE_NETWORK}
+//{$DEFINE VERBOSE_NETWORK}
+//{$DEFINE SUPER_VERBOSE_SEND}
 
 uses
    baseunix, unixtype, sockets, exceptions;
@@ -254,7 +254,7 @@ end;
 
 procedure TNetworkSocket.Write(const S: Pointer; const Len: Cardinal);
 
-{$IFDEF SUPER_VERBOSE_NETWORK}
+{$IFDEF SUPER_VERBOSE_SEND}
   function fpSend(s: cint; msg: pointer; len: size_t; flags: cint): ssize_t;
   var
      i: Cardinal;

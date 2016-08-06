@@ -4,6 +4,8 @@ unit network;
 
 interface
 
+{$DEFINE VERBOSE}
+
 uses
    corenetwork, corewebsocket;
 
