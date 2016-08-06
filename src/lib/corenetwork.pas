@@ -75,9 +75,8 @@ type
    TNetworkServer = class
     protected
       FList: PSocketListItem;
-      FFileDescriptorSet, FWriteFileDescriptorSet: TFDSet;
-      FMaxSocketNumber: cint;
       FHavePendingDisconnects: Boolean;
+      FSocketCount: Cardinal;
       procedure Add(Socket: TBaseSocket);
       procedure Remove(Socket: TBaseSocket);
       procedure Empty();
@@ -96,7 +95,7 @@ type
 implementation
 
 uses
-   sysutils {$IFDEF VERBOSE_NETWORK}, errors {$ENDIF}; // errors is for StrError
+   sysutils {$IFDEF LINUX}, linux {$ENDIF} {$IFDEF VERBOSE_NETWORK}, errors {$ENDIF}; // errors is for StrError
 
 // {$DEFINE DISABLE_NAGLE} // should not be necessary
 
@@ -400,8 +399,6 @@ end;
 constructor TNetworkServer.Create();
 begin
    inherited Create();
-   fpFD_ZERO(FFileDescriptorSet);
-   fpFD_ZERO(FWriteFileDescriptorSet);
 end;
 
 constructor TNetworkServer.Create(Port: Word);
@@ -431,9 +428,7 @@ begin
    Item^.Next := FList;
    Item^.Value := Socket;
    FList := Item;
-   if (FMaxSocketNumber < Socket.FSocketNumber) then
-      FMaxSocketNumber := Socket.FSocketNumber;
-   fpFD_SET(Socket.FSocketNumber, FFileDescriptorSet);
+   Inc(FSocketCount);
    Socket.OnDisconnect := @Self.HandleDisconnect;
    if (Socket is TNetworkSocket) then
       (Socket as TNetworkSocket).OnOverflow := @Self.HandleOverflow;
@@ -445,8 +440,6 @@ var
    Last: ^PSocketListItem;
 begin
    // this acts like the disconnect logic at the end of Select()
-   fpFD_CLR(Socket.FSocketNumber, FFileDescriptorSet);
-   fpFD_CLR(Socket.FSocketNumber, FWriteFileDescriptorSet);
    Last := @FList;
    Item := FList;
    while (Assigned(Item)) do
@@ -456,6 +449,7 @@ begin
          Last^ := Item^.Next;
          Dispose(Item);
          Item := nil;
+         Dec(FSocketCount);
       end
       else
       begin
@@ -478,8 +472,7 @@ begin
       Item^.Value.Destroy();
       Dispose(Item);
    end;
-   fpFD_ZERO(FFileDescriptorSet);
-   fpFD_ZERO(FWriteFileDescriptorSet);
+   FSocketCount := 0;
 end;
 
 procedure TNetworkServer.HandleNewConnection(ListenerSocket: TListenerSocket);
@@ -498,13 +491,13 @@ var
    Item: PSocketListItem;
 {$ENDIF}
 begin
-   fpFD_SET(Socket.FSocketNumber, FWriteFileDescriptorSet);
+   // this just asserts that the given socket is in fact in the list of sockets
    {$IFOPT C+}
    Item := FList;
    while (Assigned(Item)) do
    begin
       if (Item^.Value = Socket) then
-         Break;
+         break;
       Item := Item^.Next;
    end;
    Assert(Assigned(Item));
@@ -513,22 +506,32 @@ end;
 
 function TNetworkServer.Select(Timeout: cint): Boolean;
 var
-   fdsRead, fdsWrite, fdsExcept: TFDSet;
-   MaxSetBitNumber, Pending, IsSet: cint;
+   Index: Cardinal;
+   Pending: cint;
+   PollArray: array of PollFD;
    Item: PSocketListItem;
    Last: ^PSocketListItem;
    Disconnect: Boolean;
 begin
    Result := False;
-   fdsRead := FFileDescriptorSet;
-   fdsWrite := FWriteFileDescriptorSet;
-   fdsExcept := FFileDescriptorSet;
-   MaxSetBitNumber := FMaxSocketNumber+1; // $R-
-   Pending := fpSelect(MaxSetBitNumber, @fdsRead, @fdsWrite, @fdsExcept, Timeout);
+   if (FSocketCount = 0) then
+     exit;
+   SetLength(PollArray, FSocketCount);
+   Index := 0;
+   Item := FList;
+   while (Assigned(Item)) do
+   begin
+      PollArray[Index].fd := Item^.Value.FSocketNumber;
+      PollArray[Index].events := POLLIN or POLLOUT;
+      Item := Item^.Next;
+      Inc(Index);
+   end;
+   Assert(Index = FSocketCount);
+   Pending := fpPoll(@PollArray[0], FSocketCount, Timeout);
    if (Pending < 0) then
    begin
       case fpGetErrNo of
-         ESysEIntr: Exit; { probably received ^C or an alarm }
+         ESysEIntr: exit; { probably received ^C or an alarm }
       else
          raise EKernelError.Create(fpGetErrNo);
       end;
@@ -536,16 +539,16 @@ begin
    if (Pending = 0) then
    begin
       Result := True;
-      Exit;
+      exit;
    end;
    Item := FList;
+   Index := 0;
    while ((Pending > 0) and Assigned(Item)) do
    begin
+      Assert(PollArray[Index].fd = Item^.Value.FSocketNumber);
       Disconnect := False;
       // check if this socket was flagged for reading
-      IsSet := fpFD_ISSET(Item^.Value.FSocketNumber, fdsRead);
-      Assert(IsSet >= 0);
-      if (IsSet > 0) then
+      if ((PollArray[Index].revents and POLLIN) > 0) then
       begin
          Dec(Pending);
          try
@@ -564,34 +567,38 @@ begin
          end;
       end;
       // check if this socket was flagged for writing
-      IsSet := fpFD_ISSET(Item^.Value.FSocketNumber, fdsWrite);
-      Assert(IsSet >= 0);
-      if (IsSet > 0) then
+      if ((PollArray[Index].revents and POLLOUT) > 0) then
       begin
          Dec(Pending);
-         fpFD_CLR(Item^.Value.FSocketNumber, FWriteFileDescriptorSet);
          Assert(Item^.Value is TNetworkSocket);
          (Item^.Value as TNetworkSocket).Write(); // can call its own Disconnect()
       end;
       // check if this socket was flagged for some sort of problem
-      IsSet := fpFD_ISSET(Item^.Value.FSocketNumber, fdsExcept);
-      Assert(IsSet >= 0);
-      if (IsSet > 0) then
+      if ((PollArray[Index].revents and (POLLERR or POLLNVAL)) > 0) then
       begin
          Dec(Pending);
          Assert(Item^.Value is TNetworkSocket);
-         {$IFDEF VERBOSE_NETWORK} Writeln('select() reported i/o exception for socket ', Item^.Value.FSocketNumber); {$ENDIF}
+         {$IFDEF VERBOSE_NETWORK} Writeln('poll() reported i/o exception for socket ', Item^.Value.FSocketNumber); {$ENDIF}
          Disconnect := True;
+      end;
+      // 
+      if ((PollArray[Index].revents and (POLLHUP {$IFDEF LINUX} or POLLRDHUP {$ENDIF})) > 0) then
+      begin
+         Dec(Pending);
+         Assert(Item^.Value is TNetworkSocket);
+         {$IFDEF VERBOSE_NETWORK} Writeln('poll() reported remote disconnect for socket ', Item^.Value.FSocketNumber); {$ENDIF}
+         // XXX now what?
       end;
       // clean up and move on
       if (Disconnect) then
          Item^.Value.Disconnect();
       Item := Item^.Next;
+      Inc(Index);
    end;
    {$IFDEF VERBOSE}
    if (Pending <> 0) then
    begin
-      Writeln('Select call returned a different number of pending sockets than we could account for.');
+      Writeln('Poll call returned a different number of pending sockets than we could account for.');
       Writeln('Original pending count: ', OriginalPending, '; Remainder: ', Pending);
       Writeln('Currently open sockets: ');
       Item := FList;
@@ -612,14 +619,13 @@ begin
          begin
             Assert(Last^ = Item);
             // act like Remove()
-            fpFD_CLR(Item^.Value.FSocketNumber, FFileDescriptorSet);
-            fpFD_CLR(Item^.Value.FSocketNumber, FWriteFileDescriptorSet);
             Assert(Assigned(Item^.Value));
             Item^.Value.Destroy();
             {$IFDEF C+} Item^.Value := nil; {$ENDIF}
             Last^ := Item^.Next;
             Dispose(Item);
             Item := Last^;
+            Dec(FSocketCount);
          end
          else
          begin
