@@ -36,16 +36,27 @@ sub doSomething {
     die if $body =~ m/\0/os;
     if ($command eq 'remy') {
         pushButton($username, $password, $body);
-    } elsif ($command eq 'echo') {
-        if ($body eq 'clean the table') {
-            pushButton($username, $password, 'kitchenTableIsDirty');
-        } elsif ($body =~ m/^push *(?:the)? *button (.+)$/) {
-            my $todo = $1;
-            my $button = join('', map { "\U$_" } split(' ', $todo));
+    } elsif ($command eq 'google') {
+        if ($body eq 'wet-food') {
+            my($seconds, $minutes, $hours, $day, $month, $year, $weekday, $dayOfYear, $summerTime) = localtime(time);
+            if ($hours < 17) {
+                pushButton($username, $password, 'catFedSmallCanForBreakfast');
+            } else {
+                pushButton($username, $password, 'catFedSmallCanForDinner');
+            }
+        } elsif ($body =~ m/^push *(?:the)? *button (.+)$/i or
+                 $body =~ m/^push *(?:the)? *(.+) *button$/i) {
+            my $todo = "\L$1";
+            my @words = split(' ', $todo);
+            if ($words[0] eq 'the') {
+                shift @words;
+            }
+            my $button = join('', map { "\u$_" } @words);
+            $button = "\l$button";
             warn("trying to push button '$button'");
             pushButton($username, $password, $button);
         } else {
-            warn "unknown echo message ('$body')";
+            warn "unknown 'google' message ('$body')";
         }
     } else {
         die "unknown command ('$command')";

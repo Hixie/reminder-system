@@ -4,7 +4,7 @@ program reminder;
 
 // XXX rename "src/" to "server/"
 
-// {$DEFINE DEBUG_ESCALATIONS}
+//{$DEFINE DEBUG_ESCALATIONS}
 //{$DEFINE DEBUG_TIMING}
 //{$DEFINE VERBOSE}
 
@@ -64,6 +64,7 @@ begin
    // Message format:
    //   <username>#0<password>#0<button>
    // Empty <button> means "ping" and receives a personal "pong".
+   // (All other buttons with valid credentials receive a "pong" also, just to confirm the message was received.)
    if (Length(S) > 0) then
    begin
       Count := 0;
@@ -103,11 +104,7 @@ begin
          Exit;
       end;
       GivenButton := Copy(S, Length(GivenUsername)+Length(GivenPassword)+3, Length(S) - (Length(GivenUsername)+Length(GivenPassword)+2));
-      if (GivenButton = '') then
-      begin
-         Client.Pong();
-      end
-      else
+      if (GivenButton <> '') then
       begin
          Button := Buttons[GivenButton];
          if (not Assigned(Button)) then
@@ -124,6 +121,7 @@ begin
          Button.Press(Now());
          StateRecalculationIsPending := True;
       end;
+      Client.Pong();
    end;
 end;
 
@@ -479,8 +477,8 @@ begin
                StateRecalculationIsPending := False;
                TargetTime := IncMillisecond(CurrentTime, Timeout); // XXX we really should just keep the NextTime up to here instead of converting to a timeout then back again
                repeat
-                  {$IFDEF DEBUG_TIMING} Writeln(FormatDateTime('YYYY-MM-DD hh:nn:ss', Now), ': next scheduled event at ', FormatDateTime('YYYY-MM-DD hh:nn:ss', IncMillisecond(TargetTime)), ' (', Timeout, 'ms)'); {$ENDIF}
                   Server.Select(Timeout);
+                  {$IFDEF DEBUG_TIMING} Writeln(FormatDateTime('YYYY-MM-DD hh:nn:ss', Now), ': Network interrupted'); {$ENDIF}
                   Timeout := MillisecondsBetween(Now, TargetTime); // $R-
                until StateRecalculationIsPending or (Now >= TargetTime);
             until Aborted;

@@ -48,6 +48,10 @@
  section#messages .remote p.button { display: inline-block; margin: 0 0.5em 0.25em; }
  section#messages .remote p.button button { margin: 0.25em 0; border-radius: 0.25em; background: #996; color: #000; border: solid 2px #333; }
 
+ section#messages .status { background: #FFFFC0; color: #000000; padding: 0.25em; margin-left: 3em; margin-right: 3em; }
+ section#messages .status p { margin: 0.25em 0 0.25em 0; font-size: 0.9em; }
+ section#messages .status { border-radius: 0.5em; }
+
  section#messages .filter-hidden { display: none; }
 
  section#messages div.hottub { background-color: #EEF; border-color: #009; }
@@ -67,6 +71,8 @@
 */
 
  /* everything else */
+ section#icons { position: fixed; top: 0.25em; right: 0.5em; font-size: 18px; }
+ section#icons span { display: block; }
  section#buttons { margin-bottom: 0; padding-bottom: 0; border-radius: 1em 1em 0 0; }
  section#todos { margin-top: 0; padding-top: 0; border-radius: 0 0 1em 1em; }
  section.more { background: rgba(255, 255, 255, 0.5); border-radius: 1em; padding: 0.5em 0; }
@@ -96,7 +102,7 @@
  form > p > label > span { display: table-cell; }
  /* hover effects */
  section { transition: opacity 0.25s; }
- html:not(:hover) section:not(#messages) { opacity: 0; }
+ html:not(:hover) section#messages ~ section { opacity: 0; }
 </style>
 <body>
 <script>
@@ -108,6 +114,7 @@
 </script>
 <script src="objects.js"></script>
 <script src="utils.js"></script>
+<section id="icons"></section>
 <section id="messages">Connection to reminder system server not yet established.</section>
 <section class="more" id="buttons"></section>
 <section class="more" id="todos"><details><summary>Tasks</summary><div></div></details></section>
@@ -121,6 +128,7 @@
 <script>
   var buttonsDiv = document.getElementById('buttons');
   var messagesDiv = document.getElementById('messages');
+  var iconsDiv = document.getElementById('icons');
   var todosDiv = document.getElementById('todos').firstChild.lastChild;
   var taskCount;
   var openSummaries = null;
@@ -149,15 +157,19 @@
         buttonsDiv.textContent = '';
         messagesDiv.textContent = '';
         todosDiv.textContent = '';
+        iconsDiv.textContent = '';
         taskCount = 0;
         var bits = segments.map(function (a) { return a.split('\0') });
         for (var bit in bits) {
-          if (bits[bit][0] == 'button')
+          if (bits[bit][0] == 'button') {
             showButton(bits[bit][1], bits[bit][2], bits[bit][3]);
-          else if (bits[bit][0] == 'message')
+          } else if (bits[bit][0] == 'message') {
             showMessage(bits[bit][1], bits[bit][2], bits[bit][3], bits[bit].splice(4));
-          else if (bits[bit][0] == 'todo')
+            if (bits[bit][1].indexOf('status-icon-') == 0)
+              showIcon(bits[bit][1].substring(12));
+          } else if (bits[bit][0] == 'todo') {
             showToDo(bits[bit][1], bits[bit][2], bits[bit][3], bits[bit][4]);
+          }
         }
         openSummaries = null;
         if (taskCount == 0)
@@ -221,6 +233,22 @@
   }
   function showButton(id, highlighted, label) {
     buttonsDiv.appendChild(E('p', { id: 'button-' + id, class: 'button ' + highlighted }, E('button', { class: highlighted, onclick: getClick(id) }, label)));
+  }
+  function showIcon(icon) {
+    var emoji;
+    switch (icon) {
+      case 'rain': emoji = '⛈'; break; // U+26C8 THUNDER CLOUD AND RAIN; consider also U+2614 UMBRELLA WITH RAIN DROPS or U+26C6 RAIN
+      case 'snow': emoji = '❄'; break; // U+2744 SNOWFLAKE; consider also U+26C7 BLACK SNOWMAN
+      case 'clear': return;
+      case 'sun': emoji = '🌞'; break; // U+1F31E SUN WITH FACE; consider also U+2600 BLACK SUN WITH RAYS
+      case 'cloud': emoji = '⛅'; break; // U+26C5 SUN BEHIND CLOUD; consider also U+2601 CLOUD
+      case 'night': emoji = '🌛'; break; // U+1F31B FIRST QUARTER MOON WITH FACE; consider also U+1F303 NIGHT WITH STARS
+      // next two are prefixed by U+1F321 THERMOMETER
+      case 'hot': emoji = '🌡️↑'; break; // U+2912 UPWARDS ARROW TO BAR; consider also U+1F525 FIRE
+      case 'cold': emoji = '🌡️↓'; break; // U+2913 DOWNWARDS ARROW TO BAR
+      default: return;
+    }
+    iconsDiv.appendChild(E('span', { class: 'icon' }, emoji));
   }
   function showMessage(message, classLabel, escalation, buttons) {
     var classLabelBits = classLabel.split(' ');

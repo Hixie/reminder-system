@@ -6,6 +6,7 @@ interface
 
 //{$DEFINE VERBOSE_NETWORK}
 //{$DEFINE SUPER_VERBOSE_SEND}
+//{$DEFINE SUPER_VERBOSE_READ}
 
 uses
    baseunix, unixtype, sockets, exceptions;
@@ -28,17 +29,20 @@ type
       FConnected: Boolean;
       FOnDisconnect: TDisconnectEvent;
       FSocketNumber: cint;
+      function GetWriteDataPending(): Boolean; virtual; abstract;
     public
       procedure Disconnect(); virtual; abstract;
       function Read(): Boolean; virtual; abstract;
       property Connected: Boolean read FConnected;
       property OnDisconnect: TDisconnectEvent read FOnDisconnect write FOnDisconnect;
+      property WriteDataPending: Boolean read GetWriteDataPending;
    end;
 
    TListenerSocket = class(TBaseSocket)
     protected
       FOnNewConnection: TNewConnectionEvent;
       FPort: Word;
+      function GetWriteDataPending(): Boolean; override;
     public
       constructor Create(Port: Word);
       destructor Destroy(); override;
@@ -54,6 +58,7 @@ type
       FPendingWritesLength: Cardinal;
       FOnOverflow: TOverflowEvent;
       function InternalRead(Data: array of byte): Boolean; virtual; abstract; // return false if connection is bad
+      function GetWriteDataPending(): Boolean; override;
     public
       constructor Create(Listener: TListenerSocket);
       destructor Destroy(); override;
@@ -147,6 +152,11 @@ begin
    Result := True;
 end;
 
+function TListenerSocket.GetWriteDataPending(): Boolean;
+begin
+   Result := False;
+end;
+
 
 constructor TNetworkSocket.Create(Listener: TListenerSocket);
 var
@@ -220,13 +230,33 @@ function TNetworkSocket.Read(): Boolean;
 var
    Data: array of Byte;
    Received: ssize_t;
+{$IFDEF SUPER_VERBOSE_READ}
+   i: Cardinal;
+{$ENDIF}
 begin
    if (FConnected) then
    begin
       SetLength(Data, 4096); // smaller than High(size_t)
       Received := fpRecv(FSocketNumber, @Data[0], Length(Data), 0); // $R-
       if (Received > 0) then
-         SetLength(Data, Received); // else doesn't matter, Data isn't used
+      begin
+         SetLength(Data, Received);
+         {$IFDEF SUPER_VERBOSE_READ}
+          system.Write('received: ');
+          for i := 0 to Length(Data)-1 do // $R-
+             system.Write(Chr(Data[i]));
+          Writeln();
+          system.Write('                  hex: ');
+          for i := 0 to Length(Data)-1 do // $R-
+             system.Write(IntToHex(Data[i], 2), ' ');
+          Writeln();
+         {$ENDIF}
+      end
+      else
+      begin
+         // else doesn't matter, Data isn't used
+         {$IFDEF VERBOSE_NETWORK} Writeln('peer gracefully disconnected'); {$ENDIF}
+      end;
    end;
    // Received=0 means that the peer gracefully disconnected
    // the FConnected guard on the next line isn't understood by the compiler so it thinks
@@ -236,6 +266,7 @@ end;
 
 procedure TNetworkSocket.Write();
 begin
+   {$IFDEF VERBOSE_NETWORK} Writeln('Flushing buffer for socket ', FSocketNumber, '; buffer has ', FPendingWritesLength, ' bytes pending.'); {$ENDIF}
    Write(nil, 0);
 end;
 
@@ -259,11 +290,11 @@ procedure TNetworkSocket.Write(const S: Pointer; const Len: Cardinal);
      i: Cardinal;
   begin
      system.Write('fpSend called to send: ');
-     for i := 0 to len-1 do
+     for i := 0 to len-1 do // $R-
         system.Write(Chr(Byte((Msg+i)^)));
      Writeln();
      system.Write('                  hex: ');
-     for i := 0 to len-1 do
+     for i := 0 to len-1 do // $R-
         system.Write(IntToHex(Byte((Msg+i)^), 2), ' ');
      Writeln();
      {$IFDEF DEBUG}
@@ -280,7 +311,10 @@ var
    NeedCopy: Boolean;
 begin
    if (not FConnected) then
+   begin
+      {$IFDEF VERBOSE_NETWORK} Writeln('Writing to socket ', FSocketNumber, ' when disconnected; ignored.'); {$ENDIF}
       Exit; // Don't bother doing any work if we're not going to send it anyway
+   end;
    if (Len > 0) then
    begin
       Assert(Assigned(S));
@@ -393,6 +427,11 @@ begin
       Assert(not Assigned(FPendingWrites));
       Assert(not NeedCopy);
    end;
+end;
+
+function TNetworkSocket.GetWriteDataPending(): Boolean;
+begin
+   Result := FPendingWritesLength > 0;
 end;
 
 
@@ -522,7 +561,14 @@ begin
    while (Assigned(Item)) do
    begin
       PollArray[Index].fd := Item^.Value.FSocketNumber;
-      PollArray[Index].events := POLLIN or POLLOUT;
+      if (Item^.Value.WriteDataPending) then
+      begin
+         PollArray[Index].events := POLLIN or POLLOUT;
+      end
+      else
+      begin
+         PollArray[Index].events := POLLIN;
+      end;
       Item := Item^.Next;
       Inc(Index);
    end;
@@ -530,6 +576,7 @@ begin
    Pending := fpPoll(@PollArray[0], FSocketCount, Timeout);
    if (Pending < 0) then
    begin
+      {$IFDEF VERBOSE_NETWORK} Writeln('poll returned ', Pending, '; error is ', fpGetErrNo); {$ENDIF}
       case fpGetErrNo of
          ESysEIntr: exit; { probably received ^C or an alarm }
       else
@@ -538,6 +585,7 @@ begin
    end;
    if (Pending = 0) then
    begin
+      {$IFDEF VERBOSE_NETWORK} Writeln('poll returned zero, assuming timeout'); {$ENDIF}
       Result := True;
       exit;
    end;
@@ -551,6 +599,7 @@ begin
       if ((PollArray[Index].revents and POLLIN) > 0) then
       begin
          Dec(Pending);
+         {$IFDEF VERBOSE_NETWORK} Writeln('poll() reported data available on socket ', Item^.Value.FSocketNumber); {$ENDIF}
          try
             if (not Item^.Value.Read()) then
             begin
@@ -571,6 +620,7 @@ begin
       begin
          Dec(Pending);
          Assert(Item^.Value is TNetworkSocket);
+         {$IFDEF VERBOSE_NETWORK} Writeln('poll() reported write buffer ready for data for socket ', Item^.Value.FSocketNumber); {$ENDIF}
          (Item^.Value as TNetworkSocket).Write(); // can call its own Disconnect()
       end;
       // check if this socket was flagged for some sort of problem

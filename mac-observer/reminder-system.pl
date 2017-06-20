@@ -15,7 +15,8 @@ sub clean($) {
 open(CONFIG, '<:utf8', '.config') or die $!;
 my $username = clean <CONFIG>;
 my $password = clean <CONFIG>;
-my $alexa = clean <CONFIG>;
+my $alexaCode = clean <CONFIG>;
+my $hotword = clean <CONFIG>;
 close CONFIG;
 
 my $select = IO::Select->new();
@@ -87,30 +88,10 @@ sub process {
                     system('./tv.pl', 'on', 'retry-input', $inputName);
                     $socket->send("$username\0$password\0tvOn\0\0\0$username\0$password\0tvInput\u$inputName\0\0\0");
                 } elsif ($message eq 'alexa-reorder-cat-litter-14' and ($level == 1)) {
-                    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 4';
-                    system {'/usr/bin/say'} 'say', 'Ahem.';
-                    sleep 1;
-                    system {'/usr/bin/say'} 'say', 'Alexa, volume 6.';
-                    sleep 2;
-                    system {'/usr/bin/say'} 'say', 'Alexa, reorder World\'s Best Cat Litter 14 Pound';
-                    sleep 15;
-                    system {'/usr/bin/say'} 'say', $alexa;
-                    sleep 10;
-                    system {'/usr/bin/say'} 'say', 'Alexa, volume 3.';
-                    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 2';
+                    buy('World\'s Best Cat Litter 14 Pound');
                     $socket->send("$username\0$password\0orderedCatLitterDownstairs\0\0\0");
                 } elsif ($message eq 'alexa-reorder-filter-clean' and ($level == 1)) {
-                    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 4';
-                    system {'/usr/bin/say'} 'say', 'Ahem.';
-                    sleep 1;
-                    system {'/usr/bin/say'} 'say', 'Alexa, volume 6.';
-                    sleep 2;
-                    system {'/usr/bin/say'} 'say', 'Alexa, reorder Leisure Time Filter Clean';
-                    sleep 15;
-                    system {'/usr/bin/say'} 'say', $alexa;
-                    sleep 10;
-                    system {'/usr/bin/say'} 'say', 'Alexa, volume 3.';
-                    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 2';
+                    buy('Leisure Time Filter Clean');
                     $socket->send("$username\0$password\0hotTubFilterCleanStoreOrdered\0\0\0");
                 } elsif ($message =~ m/^wake-on-lan ([0-9a-f]{12})$/ and ($level == 1)) {
                     my $mac_addr = $1;
@@ -167,4 +148,21 @@ while (1) {
     } else {
         $socket->send("\0\0\0");
     }
+}
+
+sub buy {
+    my($product) = @_;
+    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 6';
+    system {'/usr/bin/say'} 'say', 'Ahem.';
+    sleep 1;
+    system {'/usr/bin/say'} 'say', "$hotword, volume 6.";
+    sleep 2;
+    system {'/usr/bin/say'} 'say', "$hotword, reorder $product";
+    sleep 20; # "Based on Ian's order history, I found ..product.. It's ..price... Would you like to buy it?"
+    system {'/usr/bin/say'} 'say', "yes";
+    sleep 5; # "To order it, tell me Ian's voice code."
+    system {'/usr/bin/say'} 'say', $alexaCode;
+    sleep 10;
+    system {'/usr/bin/say'} 'say', "$hotword, volume 3.";
+    system {'/usr/bin/osascript'} 'osascript', '-e', 'set Volume 2';
 }
