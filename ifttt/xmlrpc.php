@@ -39,7 +39,7 @@ sub doSomething {
     } elsif ($command eq 'google') {
         if ($body eq 'wet-food') {
             my($seconds, $minutes, $hours, $day, $month, $year, $weekday, $dayOfYear, $summerTime) = localtime(time);
-            if ($hours < 17) {
+            if ($hours > 4 and $hours < 17) {
                 pushButton($username, $password, 'catFedSmallCanForBreakfast');
             } else {
                 pushButton($username, $password, 'catFedSmallCanForDinner');

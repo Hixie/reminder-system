@@ -1,4 +1,10 @@
 #!/usr/bin/perl -wT
+
+
+#
+# This script is obsolete.
+#
+
 use strict;
 use IO::Select;
 use IO::Socket;
@@ -73,61 +79,47 @@ sub process {
         if ($level =~ m/^[0-9]$/) {
             $level = 0+$level;
             if ($classes{automatic}) {
-                if ($message eq 'tv-on') {
-                    system('./tv.pl', 'on');
-                    $socket->send("$username\0$password\0tvOn\0\0\0");
-                } elsif ($message eq 'tv-off') {
-                    system('./tv.pl', 'off');
-                    $socket->send("$username\0$password\0tvOff\0\0\0");
-                } elsif ($message =~ m/^tv-input (hdmi([1234]))$/) {
-                    my $inputName = $1;
-                    system('./tv.pl', 'retry-input', $inputName);
-                    $socket->send("$username\0$password\0tvInput\u$inputName\0\0\0");
-                } elsif ($message =~ m/^tv-on-input (hdmi([1234]))$/) {
-                    my $inputName = $1;
-                    system('./tv.pl', 'on', 'retry-input', $inputName);
-                    $socket->send("$username\0$password\0tvOn\0\0\0$username\0$password\0tvInput\u$inputName\0\0\0");
-                } elsif ($message eq 'alexa-reorder-cat-litter-14' and ($level == 1)) {
-                    buy('World\'s Best Cat Litter 14 Pound');
+                if ($message eq 'alexa-reorder-cat-litter-14' and ($level == 1)) {
+                    buy('World\'s Best Cat Litter Multiple Cat Clumping Formula 15 Pound Bag');
                     $socket->send("$username\0$password\0orderedCatLitterDownstairs\0\0\0");
                 } elsif ($message eq 'alexa-reorder-filter-clean' and ($level == 1)) {
                     buy('Leisure Time Filter Clean');
                     $socket->send("$username\0$password\0hotTubFilterCleanStoreOrdered\0\0\0");
-                } elsif ($message =~ m/^wake-on-lan ([0-9a-f]{12})$/ and ($level == 1)) {
-                    my $mac_addr = $1;
-                    my $host = '255.255.255.255';
-                    my $port = 9;
-                    my $sock = new IO::Socket::INET(Proto => 'udp') || die;
-                    my $ip_addr = inet_aton($host);
-                    my $sock_addr = sockaddr_in($port, $ip_addr);
-                    my $packet = pack('C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16);
-                    setsockopt($sock, SOL_SOCKET, SO_BROADCAST, 1);
-                    send($sock, $packet, 0, $sock_addr);
-                    close($sock);
+                # } elsif ($message =~ m/^wake-on-lan ([0-9a-f]{12})$/ and ($level == 1)) {
+                #     my $mac_addr = $1;
+                #     my $host = '255.255.255.255';
+                #     my $port = 9;
+                #     my $sock = new IO::Socket::INET(Proto => 'udp') || die;
+                #     my $ip_addr = inet_aton($host);
+                #     my $sock_addr = sockaddr_in($port, $ip_addr);
+                #     my $packet = pack('C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16);
+                #     setsockopt($sock, SOL_SOCKET, SO_BROADCAST, 1);
+                #     send($sock, $packet, 0, $sock_addr);
+                #     close($sock);
                 }
             } elsif ($level == 1) {
-                if (not $classes{quiet}) {
-                    beep($level);
-                }
+                # if (not $classes{quiet}) {
+                #     beep($level);
+                # }
             } elsif ($level >= 3) {
-                my ($sec, $min, $hour, $day, $month, $year, $weekday, $yearday, $dst) = localtime(time);
-                if (($hour < 23 and $hour > 11 and not $classes{quiet}) or $classes{important}) {
-                    print "reminder-system: verbalising reminder\n";
-                    beep($level);
-                    if ($level >= 9) { # 9
-                        $message = "Alert! Alert! $message Alert! Alert! $message";
-                    } elsif ($level >= 6) { # 6, 7, 8
-                        $message = "Attention! $message";
-                    } # 3, 4, 5
-                    system {'/usr/bin/say'} 'say', $message;
-                } else {
-                    print "reminder-system: reminder muted\n";
-                }
+                # my ($sec, $min, $hour, $day, $month, $year, $weekday, $yearday, $dst) = localtime(time);
+                # if (($hour < 23 and $hour > 11 and not $classes{quiet}) or $classes{important}) {
+                #     print "reminder-system: verbalising reminder\n";
+                #     beep($level);
+                #     if ($level >= 9) { # 9
+                #         $message = "Alert! Alert! $message Alert! Alert! $message";
+                #     } elsif ($level >= 6) { # 6, 7, 8
+                #         $message = "Attention! $message";
+                #     } # 3, 4, 5
+                #     system {'/usr/bin/say'} 'say', $message;
+                # } else {
+                #     print "reminder-system: reminder muted\n";
+                # }
             }
         }
-        if (not $classes{nomsg}) {
-            system('./tv.pl', 'msg', $message, 'delay', '2');
-        }
+        # if (not $classes{nomsg}) {
+        #     system('./tv.pl', 'msg', $message, 'delay', '2');
+        # }
     }
 }
 

@@ -45,8 +45,8 @@
 
  section#messages .remote { background: black; color: white; border-radius: 0.5em; padding: 0; }
  section#messages .remote p:first-child { margin: 0.25em 0 0.25em 0; border-bottom: thin solid white; font-size: 0.9em; }
- section#messages .remote p.button { display: inline-block; margin: 0 0.5em 0.25em; }
- section#messages .remote p.button button { margin: 0.25em 0; border-radius: 0.25em; background: #996; color: #000; border: solid 2px #333; }
+ section#messages .remote p.button { display: inline-block; margin: 0 0.25em 0.25em; }
+ section#messages .remote p.button button { margin: 0.25em 0; border-radius: 0.25em; background: #DD9; color: #000; border: none; font-size: 0.9em; text-transform: uppercase; padding: 0.25em 0.5em; min-width: 2.5em; }
 
  section#messages .status { background: #FFFFC0; color: #000000; padding: 0.25em; margin-left: 3em; margin-right: 3em; }
  section#messages .status p { margin: 0.25em 0 0.25em 0; font-size: 0.9em; }
@@ -106,11 +106,15 @@
 </style>
 <body>
 <script>
- if (window == window.top)
-   document.body.classList.add('top');
- var filter = '';
- if (location.search.substr(0, 8) == '?filter=')
-   filter = location.search.substr(8);
+ if (location.protocol == 'http:') {
+   location.protocol = 'https';
+ } else {
+   if (window == window.top)
+     document.body.classList.add('top');
+   var filter = '';
+   if (location.search.substr(0, 8) == '?filter=')
+     filter = location.search.substr(8);
+ }
 </script>
 <script src="objects.js"></script>
 <script src="utils.js"></script>
@@ -135,7 +139,7 @@
   var ws;
   function setupNetwork() {
     try {
-      ws = new WebSocket('ws://damowmow.com:12548');
+      ws = new WebSocket('wss://remy.rooves.house:12648');
     } catch (e) {
       messagesDiv.textContent = 'Error setting up WebSocket: ' + e.message;
       buttonsDiv.textContent = '';
