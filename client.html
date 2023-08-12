@@ -25,8 +25,8 @@
  section#messages .multi-stage button.highlighted { border-color: #DDD; background: #DDD; color: #666; }
  section#messages .multi-stage button.highlighted::before { content: '✔‬' }
  section#messages .test-strip { margin: 0.25em 1em; padding: 0.2em; font-size: 0.75em; }
- section#messages .test-strip p.button { display: inline-block; margin: 0 0.5em; }
- section#messages .test-strip p.button button { margin: 0.25em 0; }
+ section#messages .test-strip p.button { display: inline-block; margin: 0 0.25em; }
+ section#messages .test-strip p.button button { margin: 0.25em 0; padding: 0.25em 0.6em; }
  section#messages .escalated-level-1:not(.todo) { }
  section#messages .escalated-level-2:not(.todo) { box-shadow: 0 0 16px #900; font-weight: bold; }
  section#messages .escalated-level-3:not(.todo) { border: solid red 0.2em; } /* birman talks */
@@ -47,6 +47,7 @@
  section#messages .remote p:first-child { margin: 0.25em 0 0.25em 0; border-bottom: thin solid white; font-size: 0.9em; }
  section#messages .remote p.button { display: inline-block; margin: 0 0.25em 0.25em; }
  section#messages .remote p.button button { margin: 0.25em 0; border-radius: 0.25em; background: #DD9; color: #000; border: none; font-size: 0.9em; text-transform: uppercase; padding: 0.25em 0.5em; min-width: 2.5em; }
+ section#messages .remote p.button button.highlighted { background: #990; color: #FFF; }
 
  section#messages .status { background: #FFFFC0; color: #000000; padding: 0.25em; margin-left: 3em; margin-right: 3em; }
  section#messages .status p { margin: 0.25em 0 0.25em 0; font-size: 0.9em; }
@@ -112,8 +113,10 @@
    if (window == window.top)
      document.body.classList.add('top');
    var filter = '';
-   if (location.search.substr(0, 8) == '?filter=')
+   if (location.search.substr(0, 8) == '?filter=') {
      filter = location.search.substr(8);
+     window.document.title += ' - ' + filter;
+   }
  }
 </script>
 <script src="objects.js"></script>
@@ -284,7 +287,7 @@
     } else if (div.classList.contains('warning')) {
       messagesDiv.insertBefore(div, messagesDiv.firstChild);
     } else {
-      if (!div.classList.contains('notice') && !div.classList.contains('filter-hidden'))
+      if (!div.classList.contains('notice') && !div.classList.contains('automatic') && !div.classList.contains('filter-hidden'))
         taskCount += 1;
       messagesDiv.appendChild(div);
     }
